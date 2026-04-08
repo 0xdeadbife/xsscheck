@@ -1,7 +1,6 @@
 import { chromium, firefox } from 'playwright';
 import pLimit from 'p-limit';
-import { enumerateJobs } from './inject.js';
-import { runJob } from './worker.js';
+import { buildSchedule, runJobWithDelay } from './scheduler.js';
 
 /**
  * Scanner process entry point.
@@ -27,14 +26,14 @@ process.once('message', (msg) => {
 });
 
 async function runScanner(config) {
-  const { urls, payloads, concurrency, timeout, headful, confirmFirefox } = config;
+  const { urls, payloads, concurrency, timeout, headful, confirmFirefox, delayMin, delayMax, maxRetries } = config;
   const startTime = Date.now();
 
   const browser = await chromium.launch({ headless: !headful });
   const limit = pLimit(concurrency);
 
-  // Build full job list
-  const allJobs = urls.flatMap(url => enumerateJobs(url, payloads));
+  // Build full job list (round-robin across URLs, shuffled per URL)
+  const allJobs = buildSchedule(urls, payloads);
   const total = allJobs.length;
   let done = 0;
   const active = new Map(); // jobIndex → { url, surface }
@@ -60,7 +59,7 @@ async function runScanner(config) {
       emitProgress();
 
       try {
-        const result = await runJob(browser, job, timeout);
+        const result = await runJobWithDelay(browser, job, timeout, { delayMin, delayMax, maxRetries });
 
         if (result.hit) {
           const finding = {

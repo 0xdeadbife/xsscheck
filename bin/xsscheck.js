@@ -26,6 +26,9 @@ program
   .option('--headful', 'Run browser in headful mode', false)
   .option('--confirm-firefox', 'Re-verify hits in Firefox', false)
   .option('--timeout <ms>', 'Per-request timeout in ms', (v) => parseInt(v, 10), 8000)
+  .option('--delay-min <ms>', 'Min random delay between requests in ms', (v) => parseInt(v, 10), 50)
+  .option('--delay-max <ms>', 'Max random delay between requests in ms', (v) => parseInt(v, 10), 300)
+  .option('--max-retries <n>', 'Max retries on 429 / rate-limit', (v) => parseInt(v, 10), 2)
   .parse(process.argv);
 
 const opts = program.opts();
@@ -36,6 +39,22 @@ if (!Number.isInteger(opts.concurrency) || opts.concurrency < 1) {
 }
 if (!Number.isInteger(opts.timeout) || opts.timeout < 1) {
   console.error('Error: --timeout must be a positive integer');
+  process.exit(1);
+}
+if (!Number.isInteger(opts.delayMin) || opts.delayMin < 0) {
+  console.error('Error: --delay-min must be a non-negative integer');
+  process.exit(1);
+}
+if (!Number.isInteger(opts.delayMax) || opts.delayMax < 0) {
+  console.error('Error: --delay-max must be a non-negative integer');
+  process.exit(1);
+}
+if (opts.delayMin > opts.delayMax) {
+  console.error('Error: --delay-min must be <= --delay-max');
+  process.exit(1);
+}
+if (!Number.isInteger(opts.maxRetries) || opts.maxRetries < 0) {
+  console.error('Error: --max-retries must be a non-negative integer');
   process.exit(1);
 }
 
@@ -94,6 +113,9 @@ async function main() {
     timeout: opts.timeout,
     headful: opts.headful,
     confirmFirefox: opts.confirmFirefox,
+    delayMin: opts.delayMin,
+    delayMax: opts.delayMax,
+    maxRetries: opts.maxRetries,
   };
 
   const emitter = new EventEmitter();
