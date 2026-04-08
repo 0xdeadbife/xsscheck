@@ -3,19 +3,23 @@ import pLimit from 'p-limit';
 import { buildSchedule, runJobWithDelay } from './scheduler.js';
 
 /**
- * Scanner process entry point.
- * Receives a { type: 'config', data } message from the parent CLI process,
- * then runs all jobs and emits IPC messages back.
+ * Scanner process entry point (runs as a forked child process).
  *
- * Config shape:
- * {
- *   urls: string[],
- *   payloads: string[],
- *   concurrency: number,
- *   timeout: number,
- *   headful: boolean,
- *   confirmFirefox: boolean,
- * }
+ * Lifecycle:
+ *   1. Waits for exactly one { type: 'config', data } IPC message from the parent.
+ *   2. Launches Chromium, builds the job schedule, runs all jobs concurrently
+ *      (up to `concurrency` at a time via p-limit).
+ *   3. Streams IPC messages back to the parent as results arrive:
+ *        { type: 'progress', done, total, active }
+ *        { type: 'finding', url, param, surface, payload, sink, confirmed, firefox_confirmed }
+ *        { type: 'error', url, message }
+ *        { type: 'done', total, findings, errors, duration_ms }
+ *   4. Closes the browser and exits.
+ *
+ * All process.send() calls are wrapped in try/catch because the parent may
+ * exit (SIGINT) before the child finishes, closing the IPC channel.
+ *
+ * Config shape: see CLAUDE.md → "IPC config message schema"
  */
 process.once('message', (msg) => {
   if (msg.type !== 'config') return;

@@ -1,4 +1,24 @@
 #!/usr/bin/env node
+/**
+ * CLI entry point for xsscheck.
+ *
+ * Responsibilities:
+ *   1. Parse CLI flags (Commander)
+ *   2. Load URLs and payloads from disk
+ *   3. Mount the Ink TUI (App component)
+ *   4. Fork src/scanner/index.js as a child process
+ *   5. Send a single { type: 'config', data } IPC message to start the scan
+ *   6. Pipe IPC messages from the child onto an EventEmitter that the TUI listens to
+ *   7. On completion, write the JSON report (--output) and exit
+ *
+ * IPC message types received from the scanner child:
+ *   progress  → { done, total, active: [{url, surface}] }
+ *   finding   → { url, param, surface, payload, sink, confirmed, firefox_confirmed }
+ *   error     → { url, message }
+ *   done      → { total, findings, errors, duration_ms }
+ *
+ * See CLAUDE.md for the full architecture and IPC schema.
+ */
 import { fork } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readFile } from 'node:fs/promises';
