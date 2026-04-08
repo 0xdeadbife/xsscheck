@@ -27,53 +27,58 @@ export async function runJob(browser, job, timeout) {
  * @returns {Promise<{ hit: boolean, sink: string|null }>}
  */
 async function probe(browser, job, timeout) {
-  const context = await browser.newContext({
-    ignoreHTTPSErrors: true,
-  });
-  const page = await context.newPage();
-
-  let dialogSink = null;
-
-  page.on('dialog', async (dialog) => {
-    dialogSink = 'dialog';
-    await dialog.dismiss().catch(() => {});
-  });
-
-  await page.addInitScript(INIT_SCRIPT);
-
-  if (job.surface === 'headers') {
-    await context.setExtraHTTPHeaders(buildHeadersPayload(job.payload));
-  } else if (job.surface === 'cookies') {
-    const hostname = new URL(job.url).hostname;
-    await context.addCookies([{
-      name: 'xss',
-      value: job.payload,
-      domain: hostname,
-      path: '/',
-    }]);
-  }
-
+  const context = await browser.newContext({ ignoreHTTPSErrors: true });
   try {
-    // Race: Playwright networkidle vs hard timeout
-    await Promise.race([
-      page.goto(job.url, { waitUntil: 'networkidle', timeout }),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('hard timeout')), timeout)
-      ),
-    ]);
-  } catch {
-    // Timeout or navigation error — still check for hits that fired before abort
+    const page = await context.newPage();
+
+    let dialogSink = null;
+    page.on('dialog', async (dialog) => {
+      dialogSink = 'dialog';
+      await dialog.dismiss().catch(() => {});
+    });
+
+    await page.addInitScript(INIT_SCRIPT);
+
+    if (job.surface === 'headers') {
+      await context.setExtraHTTPHeaders(buildHeadersPayload(job.payload));
+    } else if (job.surface === 'cookies') {
+      const hostname = new URL(job.url).hostname;
+      await context.addCookies([{
+        name: 'xss',
+        value: job.payload,
+        domain: hostname,
+        path: '/',
+      }]);
+    }
+
+    let hardTimeoutId;
+    const hardTimeoutPromise = new Promise((_, reject) => {
+      hardTimeoutId = setTimeout(() => reject(new Error('hard timeout')), timeout + 1000);
+    });
+
+    try {
+      await Promise.race([
+        page.goto(job.url, { waitUntil: 'networkidle', timeout }),
+        hardTimeoutPromise,
+      ]);
+    } catch {
+      // Timeout or navigation error — still check for hits that fired before abort
+    } finally {
+      clearTimeout(hardTimeoutId);
+    }
+
+    let hits = [];
+    try {
+      hits = await page.evaluate(() => window.__xss_hits ?? []);
+    } catch {
+      // Page may have crashed; no hits
+    }
+
+    // Playwright-level dialog events (dialogSink) and INIT_SCRIPT hooks both capture dialog sinks.
+    // dialogSink takes priority via ?? — if both fired, we prefer the Playwright event.
+    const sink = dialogSink ?? (hits.length > 0 ? hits[0].sink : null);
+    return { hit: sink !== null, sink };
+  } finally {
+    await context.close().catch(() => {});
   }
-
-  let hits = [];
-  try {
-    hits = await page.evaluate(() => window.__xss_hits ?? []);
-  } catch {
-    // Page may have crashed; no hits
-  }
-
-  await context.close().catch(() => {});
-
-  const sink = dialogSink ?? (hits.length > 0 ? hits[0].sink : null);
-  return { hit: sink !== null, sink };
 }
