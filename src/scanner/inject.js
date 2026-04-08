@@ -1,5 +1,14 @@
+// Detects payloads that already contain percent-encoded sequences (e.g. %252F, %2F).
+// These must be injected raw into the URL string — passing them through URL.searchParams.set()
+// would double-encode the % to %25, corrupting the intended WAF bypass.
+const PRE_ENCODED_RE = /%[0-9A-Fa-f]{2}/;
+
 /**
  * Replace one query param value with a payload, return modified URL string.
+ *
+ * If the payload contains existing percent-encoding (e.g. %252F for a double-encoded slash),
+ * it is injected raw to preserve the intended encoding. Otherwise URL.searchParams handles it.
+ *
  * @param {string} urlStr
  * @param {string} param
  * @param {string} payload
@@ -7,6 +16,23 @@
  */
 export function injectUrlParam(urlStr, param, payload) {
   const u = new URL(urlStr);
+
+  if (PRE_ENCODED_RE.test(payload)) {
+    // Raw injection: build query string manually, slot payload in as-is
+    const parts = [];
+    let injected = false;
+    for (const [k, v] of u.searchParams) {
+      if (k === param && !injected) {
+        parts.push(`${encodeURIComponent(k)}=${payload}`);
+        injected = true;
+      } else {
+        parts.push(`${encodeURIComponent(k)}=${encodeURIComponent(v)}`);
+      }
+    }
+    if (!injected) parts.push(`${encodeURIComponent(param)}=${payload}`);
+    return `${u.origin}${u.pathname}?${parts.join('&')}${u.hash}`;
+  }
+
   u.searchParams.set(param, payload);
   return u.toString();
 }

