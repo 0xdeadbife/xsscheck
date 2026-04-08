@@ -30,6 +30,15 @@ program
 
 const opts = program.opts();
 
+if (!Number.isInteger(opts.concurrency) || opts.concurrency < 1) {
+  console.error('Error: --concurrency must be a positive integer');
+  process.exit(1);
+}
+if (!Number.isInteger(opts.timeout) || opts.timeout < 1) {
+  console.error('Error: --timeout must be a positive integer');
+  process.exit(1);
+}
+
 // Validate: --url and --list are mutually exclusive; one is required
 if (!opts.url && !opts.list) {
   console.error('Error: provide --url <url> or --list <file>');
@@ -43,7 +52,13 @@ if (opts.url && opts.list) {
 // Load URLs
 async function loadUrls() {
   if (opts.url) return [opts.url];
-  const text = await readFile(opts.list, 'utf8');
+  const text = await readFile(opts.list, 'utf8').catch((err) => {
+    if (err.code === 'ENOENT') {
+      console.error(`Error: URL list file not found: ${opts.list}`);
+      process.exit(1);
+    }
+    throw err;
+  });
   return text.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('#'));
 }
 
@@ -60,6 +75,10 @@ function resolvePayloadFile() {
 
 async function main() {
   const urls = await loadUrls();
+  if (urls.length === 0) {
+    console.error('Error: URL list is empty after filtering');
+    process.exit(1);
+  }
   const payloadFile = resolvePayloadFile();
   const payloads = await loadPayloads(payloadFile);
 
@@ -96,11 +115,6 @@ async function main() {
     { stdio: ['inherit', 'inherit', 'inherit', 'ipc'] }
   );
 
-  // Pipe IPC messages from scanner → emitter → TUI
-  scanner.on('message', (msg) => {
-    emitter.emit(msg.type, msg);
-  });
-
   const allFindings = [];
   const allErrors = [];
 
@@ -108,7 +122,10 @@ async function main() {
   emitter.on('error', (e) => allErrors.push(e));
 
   // Graceful shutdown on ctrl+c
+  let shuttingDown = false;
   process.on('SIGINT', async () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     scanner.kill();
     if (opts.output) {
       await writeReport(opts.output, {
@@ -121,13 +138,9 @@ async function main() {
     process.exit(0);
   });
 
-  // Send config to scanner
-  scanner.send({ type: 'config', data: config });
-
-  // Write report when scanner finishes
+  // Pipe IPC messages from scanner → emitter → TUI
   scanner.on('message', async (msg) => {
-    if (msg.type !== 'done') return;
-    if (opts.output) {
+    if (msg.type === 'done' && opts.output) {
       await writeReport(opts.output, {
         targets: urls.length,
         payloads: payloads.length,
@@ -137,7 +150,18 @@ async function main() {
         process.stderr.write(`Warning: could not write output file: ${err.message}\n`);
       });
     }
+    emitter.emit(msg.type, msg);
   });
+
+  // Emit a synthetic done if the scanner crashes so the TUI doesn't hang
+  scanner.on('exit', (code) => {
+    if (code !== 0 && code !== null) {
+      emitter.emit('done', { total: 0, findings: 0, errors: 1, duration_ms: 0 });
+    }
+  });
+
+  // Send config to scanner
+  scanner.send({ type: 'config', data: config });
 
   await waitUntilExit();
   scanner.kill();
