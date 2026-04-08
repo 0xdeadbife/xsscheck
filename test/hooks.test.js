@@ -15,6 +15,16 @@ test('INIT_SCRIPT hooks window.alert', () => {
   assert.ok(INIT_SCRIPT.includes('window.alert'));
 });
 
+test('INIT_SCRIPT hooks window.confirm and returns true', () => {
+  assert.ok(INIT_SCRIPT.includes('window.confirm'));
+  assert.ok(INIT_SCRIPT.includes('return true'));
+});
+
+test('INIT_SCRIPT hooks window.prompt and returns empty string', () => {
+  assert.ok(INIT_SCRIPT.includes('window.prompt'));
+  assert.ok(INIT_SCRIPT.includes("return ''"));
+});
+
 test('INIT_SCRIPT hooks window.fetch', () => {
   assert.ok(INIT_SCRIPT.includes('window.fetch'));
 });
