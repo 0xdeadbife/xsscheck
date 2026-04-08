@@ -18,9 +18,12 @@ import { runJob } from './worker.js';
  *   confirmFirefox: boolean,
  * }
  */
-process.on('message', async (msg) => {
+process.once('message', (msg) => {
   if (msg.type !== 'config') return;
-  await runScanner(msg.data);
+  runScanner(msg.data).catch((err) => {
+    try { process.send({ type: 'error', url: null, message: String(err?.message ?? err) }); } catch { /* IPC closed */ }
+    try { process.send({ type: 'done', total: 0, findings: 0, errors: 1, duration_ms: 0 }); } catch { /* IPC closed */ }
+  });
 });
 
 async function runScanner(config) {
@@ -69,28 +72,34 @@ async function runScanner(config) {
           // Firefox cross-check (optional)
           if (confirmFirefox && result.confirmed) {
             const ffBrowser = await firefox.launch({ headless: !headful });
-            const ffResult = await runJob(ffBrowser, job, timeout);
-            finding.firefox_confirmed = ffResult.hit;
-            await ffBrowser.close().catch(() => {});
+            try {
+              const ffResult = await runJob(ffBrowser, job, timeout);
+              finding.firefox_confirmed = ffResult.hit;
+            } finally {
+              await ffBrowser.close().catch(() => {});
+            }
           }
 
           findings.push(finding);
           process.send({ type: 'finding', ...finding });
         }
       } catch (err) {
-        const errorEntry = { url: job.url, message: err.message };
+        const errorEntry = { url: job.url, message: String(err?.message ?? err) };
         errors.push(errorEntry);
-        process.send({ type: 'error', ...errorEntry });
+        try { process.send({ type: 'error', ...errorEntry }); } catch { /* IPC closed */ }
+      } finally {
+        active.delete(i);
+        done++;
+        emitProgress();
       }
-
-      active.delete(i);
-      done++;
-      emitProgress();
     })
   );
 
-  await Promise.all(tasks);
-  await browser.close().catch(() => {});
+  try {
+    await Promise.all(tasks);
+  } finally {
+    await browser.close().catch(() => {});
+  }
 
   process.send({
     type: 'done',
