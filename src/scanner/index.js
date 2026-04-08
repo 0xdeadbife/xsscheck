@@ -42,12 +42,16 @@ async function runScanner(config) {
   const errors = [];
 
   function emitProgress() {
-    process.send({
-      type: 'progress',
-      done,
-      total,
-      active: [...active.values()],
-    });
+    try {
+      process.send({
+        type: 'progress',
+        done,
+        total,
+        active: [...active.values()],
+      });
+    } catch {
+      // IPC channel closed (parent process exited)
+    }
   }
 
   const tasks = allJobs.map((job, i) =>
@@ -81,7 +85,9 @@ async function runScanner(config) {
           }
 
           findings.push(finding);
-          process.send({ type: 'finding', ...finding });
+          try {
+            process.send({ type: 'finding', ...finding });
+          } catch { /* IPC closed */ }
         }
       } catch (err) {
         const errorEntry = { url: job.url, message: String(err?.message ?? err) };
@@ -101,11 +107,13 @@ async function runScanner(config) {
     await browser.close().catch(() => {});
   }
 
-  process.send({
-    type: 'done',
-    total,
-    findings: findings.length,
-    errors: errors.length,
-    duration_ms: Date.now() - startTime,
-  });
+  try {
+    process.send({
+      type: 'done',
+      total,
+      findings: findings.length,
+      errors: errors.length,
+      duration_ms: Date.now() - startTime,
+    });
+  } catch { /* IPC closed */ }
 }

@@ -1,5 +1,5 @@
 import { INIT_SCRIPT } from './hooks.js';
-import { buildHeadersPayload } from './inject.js';
+import { buildHeadersPayload, buildCookiesPayload } from './inject.js';
 
 /**
  * Run a single XSS check job. Probes once; if a hit is found, rechecks in a
@@ -42,13 +42,23 @@ async function probe(browser, job, timeout) {
     if (job.surface === 'headers') {
       await context.setExtraHTTPHeaders(buildHeadersPayload(job.payload));
     } else if (job.surface === 'cookies') {
+      // Preflight: collect cookies the server sets on a normal request
+      const preflight = await browser.newContext({ ignoreHTTPSErrors: true });
+      let existingCookies = [];
+      try {
+        const pfPage = await preflight.newPage();
+        await pfPage.goto(job.url, { waitUntil: 'domcontentloaded', timeout }).catch(() => {});
+        existingCookies = await preflight.cookies();
+      } finally {
+        await preflight.close().catch(() => {});
+      }
+
       const hostname = new URL(job.url).hostname;
-      await context.addCookies([{
-        name: 'xss',
-        value: job.payload,
-        domain: hostname,
-        path: '/',
-      }]);
+      const cookiesToInject = existingCookies.length > 0
+        ? buildCookiesPayload(existingCookies, job.payload)
+        : [{ name: 'xss', value: job.payload, domain: hostname, path: '/' }];
+
+      await context.addCookies(cookiesToInject);
     }
 
     let hardTimeoutId;
