@@ -23,6 +23,24 @@ export function App({ emitter, target, payloadCount, concurrency }) {
   const [errors, setErrors] = useState([]);
   const [summary, setSummary] = useState(null);
 
+  // Compute summary line once `done` arrives
+  let summaryText = null;
+  if (summary) {
+    if (findings.length === 0) {
+      summaryText = `Done. No findings — ${summary.duration_ms}ms`;
+      if (errors.length > 0) summaryText += ` · ${errors.length} error${errors.length !== 1 ? 's' : ''}`;
+    } else {
+      const endpoints = new Set(findings.map(f => `${f.url}::${f.param ?? ''}::${f.surface}`)).size;
+      const parts = [
+        `Done.  ${endpoints} endpoint${endpoints !== 1 ? 's' : ''} vulnerable`,
+        `${findings.length} payload${findings.length !== 1 ? 's' : ''}`,
+        `${summary.duration_ms}ms`,
+      ];
+      if (errors.length > 0) parts.push(`${errors.length} error${errors.length !== 1 ? 's' : ''}`);
+      summaryText = parts.join(' · ');
+    }
+  }
+
   useEffect(() => {
     emitter.on('progress', (msg) => {
       setProgress({ done: msg.done, total: msg.total, active: msg.active });
@@ -71,13 +89,13 @@ export function App({ emitter, target, payloadCount, concurrency }) {
     React.createElement(Findings, { findings, errors }),
 
     // Done summary
-    summary && React.createElement(
+    summaryText && React.createElement(
       Box,
       { marginTop: 1, marginLeft: 2 },
       React.createElement(
         Text,
-        { color: 'green', bold: true },
-        `Done. ${summary.findings} finding(s) in ${summary.duration_ms}ms.`
+        { color: findings.length > 0 ? 'green' : 'cyan', bold: true },
+        summaryText
       )
     ),
 

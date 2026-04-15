@@ -4,9 +4,8 @@
  * Writes hits to window.__xss_hits for later evaluation.
  *
  * NOTE: addInitScript runs in every frame (main + iframes). Each frame gets its own
- * window.__xss_hits array. The caller in worker.js must collect hits from all frames
- * using page.frames() if iframe-level XSS detection is desired. For main-frame-only
- * detection, evaluating on the main page is sufficient.
+ * window.__xss_hits array. worker.js collects hits from all frames via page.frames()
+ * so that XSS firing inside an iframe is detected correctly.
  */
 export const INIT_SCRIPT = `
 (function () {

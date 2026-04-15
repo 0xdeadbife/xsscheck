@@ -1,6 +1,7 @@
 import { chromium, firefox } from 'playwright';
 import pLimit from 'p-limit';
 import { buildSchedule, runJobWithDelay } from './scheduler.js';
+import { runJob } from './worker.js';
 
 /**
  * Scanner process entry point (runs as a forked child process).
@@ -34,6 +35,7 @@ async function runScanner(config) {
   const startTime = Date.now();
 
   const browser = await chromium.launch({ headless: !headful });
+  const ffBrowser = confirmFirefox ? await firefox.launch({ headless: !headful }) : null;
   const limit = pLimit(concurrency);
 
   // Build full job list (round-robin across URLs, shuffled per URL)
@@ -77,14 +79,9 @@ async function runScanner(config) {
           };
 
           // Firefox cross-check (optional)
-          if (confirmFirefox && result.confirmed) {
-            const ffBrowser = await firefox.launch({ headless: !headful });
-            try {
-              const ffResult = await runJob(ffBrowser, job, timeout);
-              finding.firefox_confirmed = ffResult.hit;
-            } finally {
-              await ffBrowser.close().catch(() => {});
-            }
+          if (ffBrowser && result.confirmed) {
+            const ffResult = await runJob(ffBrowser, job, timeout);
+            finding.firefox_confirmed = ffResult.hit;
           }
 
           findings.push(finding);
@@ -108,6 +105,7 @@ async function runScanner(config) {
     await Promise.all(tasks);
   } finally {
     await browser.close().catch(() => {});
+    await ffBrowser?.close().catch(() => {});
   }
 
   try {

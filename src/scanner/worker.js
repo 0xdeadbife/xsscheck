@@ -58,7 +58,14 @@ async function probe(browser, job, timeout) {
         ? buildCookiesPayload(existingCookies, job.payload)
         : [{ name: 'xss', value: job.payload, domain: hostname, path: '/' }];
 
-      await context.addCookies(cookiesToInject);
+      try {
+        await context.addCookies(cookiesToInject);
+      } catch {
+        // Payload contains characters invalid in cookie values (e.g. <, >, ").
+        // If the browser rejects the cookie, the payload can't execute via this
+        // surface anyway — skip rather than error.
+        return { hit: false, sink: null };
+      }
     }
 
     let hardTimeoutId;
@@ -79,7 +86,11 @@ async function probe(browser, job, timeout) {
 
     let hits = [];
     try {
-      hits = await page.evaluate(() => window.__xss_hits ?? []);
+      // Collect hits from every frame (main + iframes) — INIT_SCRIPT runs in
+      // all frames, each with its own window.__xss_hits array.
+      hits = (await Promise.all(
+        page.frames().map(f => f.evaluate(() => window.__xss_hits ?? []).catch(() => []))
+      )).flat();
     } catch {
       // Page may have crashed; no hits
     }
