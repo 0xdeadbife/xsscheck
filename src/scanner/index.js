@@ -69,7 +69,7 @@ async function runScanner(config) {
 
         if (result.hit) {
           const finding = {
-            url: job.url,
+            url: job.baseUrl ?? job.url,
             param: job.param,
             surface: job.surface,
             payload: job.payload,

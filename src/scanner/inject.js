@@ -74,13 +74,14 @@ export function enumerateJobs(urlStr, payloads) {
     for (const param of params) {
       jobs.push({
         url: injectUrlParam(urlStr, param, payload),
+        baseUrl: urlStr,
         payload,
         surface: 'url_param',
         param,
       });
     }
-    jobs.push({ url: urlStr, payload, surface: 'headers', param: null });
-    jobs.push({ url: urlStr, payload, surface: 'cookies', param: null });
+    jobs.push({ url: urlStr, baseUrl: urlStr, payload, surface: 'headers', param: null });
+    jobs.push({ url: urlStr, baseUrl: urlStr, payload, surface: 'cookies', param: null });
   }
 
   return jobs;
