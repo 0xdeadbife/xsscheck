@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 
-const MAX_PAYLOAD_LEN = 80;
+const MAX_PAYLOAD_LEN = 120;
 const MAX_PAYLOADS_SHOWN = 3;
 
 function truncate(str, len) {

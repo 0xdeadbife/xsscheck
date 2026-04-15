@@ -8,7 +8,7 @@ function truncate(str) {
 }
 
 /**
- * @param {{ active: Array<{url: string, surface: string}> }} props
+ * @param {{ active: Array<{url: string, surface: string, param: string|null}> }} props
  */
 export function WorkerList({ active }) {
   if (active.length === 0) return null;
@@ -22,7 +22,8 @@ export function WorkerList({ active }) {
         { key: i },
         React.createElement(Text, { color: 'yellow' }, '● '),
         React.createElement(Text, { dimColor: true }, `[${w.surface}] `),
-        React.createElement(Text, null, truncate(w.url))
+        React.createElement(Text, null, truncate(w.url)),
+        w.param != null && React.createElement(Text, { dimColor: true }, `  param: ${w.param}`)
       )
     )
   );

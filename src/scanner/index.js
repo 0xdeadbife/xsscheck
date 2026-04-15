@@ -61,7 +61,7 @@ async function runScanner(config) {
 
   const tasks = allJobs.map((job, i) =>
     limit(async () => {
-      active.set(i, { url: job.url, surface: job.surface });
+      active.set(i, { url: job.baseUrl ?? job.url, surface: job.surface, param: job.param });
       emitProgress();
 
       try {
